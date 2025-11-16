@@ -8,7 +8,7 @@ use actix_web::{middleware, post, web, App, HttpRequest, HttpResponse, HttpServe
 use actix_web_static_files::ResourceFiles;
 
 use crate::core::server::web::service::VntsWebService;
-use crate::core::server::web::vo::req::{CreateWGData, LoginData, RemoveClientReq};
+use crate::core::server::web::vo::req::{CreateWGData, LoginData, RemoveClientReq, GroupPasswordReq, VerifyPasswordReq};
 
 use crate::core::server::web::vo::ResponseMessage;
 use crate::core::store::cache::AppCache;
@@ -129,6 +129,8 @@ pub async fn start(
             .service(create_wg_config)
             .service(group_list)
             .service(group_info)
+            .service(check_group_password)       
+            .service(verify_group_password)
             .service(ResourceFiles::new("/", generated))
     })
     .listen(lst)?
