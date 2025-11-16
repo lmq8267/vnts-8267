@@ -216,26 +216,7 @@
             $('#select_ul').html('').append(options);
         }
     }
-    /* 存储待验证的组网ID */
-    let pendingGroupId = null;
-    function searchInput(tempArr) {  
-        $('#select_input').on('keypress', function (e) {  
-            if (e.which === 13) { 
-                var inputVal = $(this).val().trim();  
-                if (tempArr.includes(inputVal)) {  
-                    $("input[name='groupId']").val(inputVal);  
-                    /* 不直接显示,先尝试验证密码 */
-                    checkGroupPassword(inputVal);  
-                } else {  
-                    alert('组网token不存在');  
-                }  
-            }  
-        });  
-      
-        $('#search_select').hide();  
-        $('.group_len').html(''); 
-    }
-
+    
     /* 检查组网是否需要密码 */
     function checkGroupPassword(groupId) {  
         /* 调用后端API检查是否需要密码 */ 
@@ -255,8 +236,28 @@
                 alert('查找组网失败');  
             }  
         });  
-    }  
-
+    }
+    
+    /* 存储待验证的组网ID */
+    let pendingGroupId = null;
+    function searchInput(tempArr) {  
+        $('#select_input').on('keypress', function (e) {  
+            if (e.which === 13) { 
+                var inputVal = $(this).val().trim();  
+                if (inputVal) {   
+                    $("input[name='groupId']").val(inputVal);  
+                    /* 不直接显示,先尝试验证密码 */
+                    checkGroupPassword(inputVal);  
+                } else {  
+                    alert('组网token不存在');  
+                }  
+            }  
+        });  
+      
+        $('#search_select').hide();  
+        $('.group_len').html(''); 
+    }
+  
     function displayDeviceInfo(groupId, data) {
         let devices = data.clients;
         const tableBody = document.getElementById('deviceTable').getElementsByTagName('tbody')[0];
