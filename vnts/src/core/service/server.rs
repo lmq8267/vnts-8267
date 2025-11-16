@@ -311,7 +311,13 @@ impl ServerPacketHandler {
                 let source = net_packet.source();  
                 let dest_u32: u32 = destination.into();  
                 let source_u32: u32 = source.into();  
-              
+              if source_subnet == dest_subnet {  
+    println!("检测到客户端网段网关心跳包: 源={}, 目标={}", source, destination);  
+    // 响应 Pong 包  
+    let client_gateway = (source_u32 & 0xFFFFFF00) | 1;  
+    println!("准备响应 Pong: 网关={}", Ipv4Addr::from(client_gateway));  
+    // ...  
+}
                 // 检查是否为客户端网段的 .1 地址  
                 if (dest_u32 & 0xFF) == 1 {  
                     let source_subnet = source_u32 & 0xFFFFFF00;  
@@ -545,6 +551,12 @@ impl ServerPacketHandler {
         net_packet: NetPacket<B>,
         addr: SocketAddr,
     ) -> Result<NetPacket<Vec<u8>>> {
+        println!("收到数据包: 协议={:?}, 传输协议={}, 源={}, 目标={}",   
+        net_packet.protocol(),   
+        net_packet.transport_protocol(),  
+        net_packet.source(),  
+        net_packet.destination()  
+    );
         let req = message::HandshakeRequest::parse_from_bytes(net_packet.payload())?;
         log::info!("handshake:{},{}", addr, req);
         let mut res = message::HandshakeResponse::new();
