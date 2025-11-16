@@ -180,9 +180,10 @@ impl AppCache {
         log::info!("成功保存 {} 个WireGuard配置到 {:?}", count, config_path);  
         Ok(())  
     }  
+}
 
-    // 加载或生成服务器WireGuard密钥对  
-    pub fn load_or_generate_server_wg_keys() -> (StaticSecret, PublicKey) {  
+// 加载或生成服务器WireGuard密钥对  
+pub fn load_or_generate_server_wg_keys() -> (StaticSecret, PublicKey) {  
     let key_path = get_wg_dir().join("server_keys.json");  
       
     // 尝试加载现有密钥  
@@ -200,8 +201,8 @@ impl AppCache {
             }  
         }  
         log::warn!("加载服务器WireGuard密钥对失败,将生成新的密钥对");  
-    }
-
+    }  
+      
     // 生成新密钥对  
     let secret = StaticSecret::random_from_rng(rand::thread_rng());  
     let public = PublicKey::from(&secret);  
@@ -218,9 +219,9 @@ impl AppCache {
         } else {  
             log::info!("成功生成并保存服务器WireGuard密钥对到 {:?}", key_path);  
         }  
-    }
-
-    (secret, public)
+    }  
+      
+    (secret, public)  
 }
 
 impl AppCache {
