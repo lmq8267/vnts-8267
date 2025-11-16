@@ -236,45 +236,25 @@ impl ServerPacketHandler {
                         self.broadcast(&link_context, broadcast_net_packet, &exclude)?;
                         return Ok(None);
                     }
-                    protocol::ip_turn_packet::Protocol::Ipv4 => {  
-                        let destination = net_packet.destination();  
-                        let source = net_packet.source();  
-                        let mut ipv4 = IpV4Packet::new(net_packet.payload_mut())?;  
-                        if let ipv4::protocol::Protocol::Icmp = ipv4.protocol() {  
-                            let mut icmp_packet = icmp::IcmpPacket::new(ipv4.payload_mut())?;  
-                            if icmp_packet.kind() == Kind::EchoRequest {  
-                                let dest_u32: u32 = destination.into();  
-                                let is_gateway = destination == self.config.gateway;  
-              
-                                // 检查是否为某个客户端网段的 .1 地址  
-                                let mut is_client_subnet_gateway = false;  
-                                if (dest_u32 & 0xFF) == 1 {  
-                                    // 获取目标地址的网段（前三个字节）  
-                                    let dest_subnet = dest_u32 & 0xFFFFFF00;  
-                  
-                                    // 检查是否有客户端在这个网段  
-                                    for client_ip in link_context.network_info.read().clients.keys() {  
-                                        let client_subnet = client_ip & 0xFFFFFF00;  
-                                        if dest_subnet == client_subnet {  
-                                            is_client_subnet_gateway = true;  
-                                            break;  
-                                        }  
-                                    }  
-                                } 
-              
-                                if is_gateway || is_client_subnet_gateway {  
-                                    icmp_packet.set_kind(Kind::EchoReply);  
-                                    icmp_packet.update_checksum();  
-                                    ipv4.set_source_ip(destination);  
-                                    ipv4.set_destination_ip(source);  
-                                    ipv4.update_checksum();  
-                                    return Ok(Some(NetPacket::new0(  
-                                        net_packet.data_len(),  
-                                        net_packet.raw_buffer().to_vec(),  
-                                    )?));  
-                                } 
-                            }  
-                        }  
+                    protocol::ip_turn_packet::Protocol::Ipv4 => {
+                        let destination = net_packet.destination();
+                        let source = net_packet.source();
+                        let mut ipv4 = IpV4Packet::new(net_packet.payload_mut())?;
+                        if let ipv4::protocol::Protocol::Icmp = ipv4.protocol() {
+                            let mut icmp_packet = icmp::IcmpPacket::new(ipv4.payload_mut())?;
+                            if icmp_packet.kind() == Kind::EchoRequest {
+                                //开启ping
+                                icmp_packet.set_kind(Kind::EchoReply);
+                                icmp_packet.update_checksum();
+                                ipv4.set_source_ip(destination);
+                                ipv4.set_destination_ip(source);
+                                ipv4.update_checksum();
+                                return Ok(Some(NetPacket::new0(
+                                    net_packet.data_len(),
+                                    net_packet.raw_buffer().to_vec(),
+                                )?));
+                            }
+                        }
                     }
                     _ => {}
                 }
@@ -302,64 +282,6 @@ impl ServerPacketHandler {
         tcp_sender: &Option<Sender<Vec<u8>>>,
         server_secret: bool,
     ) -> result::Result<Result<Option<NetPacket<Vec<u8>>>>, NetPacket<B>> {
-       // 检查是否是发送到客户端网段网关的心跳包  
-    if net_packet.protocol() == Protocol::Control {  
-        if let control_packet::Protocol::Ping =   
-            protocol::control_packet::Protocol::from(net_packet.transport_protocol())  
-        {  
-            let destination = net_packet.destination();  
-            let source = net_packet.source();  
-            let dest_u32: u32 = destination.into();  
-            let source_u32: u32 = source.into();  
-              
-            // 检查是否为客户端网段的 .1 地址  
-            if (dest_u32 & 0xFF) == 1 {  
-                let source_subnet = source_u32 & 0xFFFFFF00;  
-                let dest_subnet = dest_u32 & 0xFFFFFF00;  
-                  
-                if source_subnet == dest_subnet {  
-    println!("检测到客户端网段网关心跳包: 源={}, 目标={}", source, destination);  
-    let client_gateway = (source_u32 & 0xFFFFFF00) | 1;  
-    println!("准备响应 Pong: 网关={}", Ipv4Addr::from(client_gateway));  
-      
-    // 创建 Pong 响应包  
-    let vec = vec![0u8; 12 + 4 + ENCRYPTION_RESERVED];  
-    let mut packet = match NetPacket::new_encrypt(vec) {  
-        Ok(p) => p,  
-        Err(e) => return Ok(Err(e.into())),  
-    };  
-    packet.set_protocol(Protocol::Control);  
-    packet.set_transport_protocol(control_packet::Protocol::Pong.into());  
-    if let Err(e) = packet.set_payload(net_packet.payload()) {  
-        return Ok(Err(e.into()));  
-    }  
-    let mut pong_packet = match control_packet::PongPacket::new(packet.payload_mut()) {  
-        Ok(p) => p,  
-        Err(e) => return Ok(Err(e.into())),  
-    };  
-      
-    // 设置 epoch  
-    if let Some(link_ctx) = &context.link_context {  
-        let epoch = link_ctx.network_info.read().epoch;  
-        pong_packet.set_epoch(epoch as u16);  
-    } else {  
-        pong_packet.set_epoch(0);  
-    }  
-      
-    // 设置正确的源地址和目标地址  
-    packet.set_source(client_gateway.into());  
-    packet.set_destination(source);  
-    packet.set_default_version();  
-    packet.first_set_ttl(MAX_TTL);  
-    packet.set_gateway_flag(true);  
-      
-    println!("发送 Pong 包: 源={}, 目标={}", Ipv4Addr::from(client_gateway), source);  
-      
-    return Ok(Ok(Some(packet)));  
-}
-            }  
-        }  
-    }
         if net_packet.protocol() == Protocol::Service {
             if let service_packet::Protocol::RegistrationRequest =
                 protocol::service_packet::Protocol::from(net_packet.transport_protocol())
@@ -395,16 +317,6 @@ impl ServerPacketHandler {
         let epoch = context.network_info.read().epoch;
         // 这里给客户端的是丢失精度的，可能导致客户端无法感知变更
         pong_packet.set_epoch(epoch as u16);
-        // 计算客户端所在网段的 .1 地址作为网关  
-        let source = net_packet.source();           // 客户端 IP 
-        let source_u32: u32 = source.into();  
-        let client_gateway = (source_u32 & 0xFFFFFF00) | 1;  // 计算 x.x.x.1  
-      
-        packet.set_source(client_gateway.into());   // Pong 包的源地址是计算出的网关
-        packet.set_destination(source);             // Pong 包的目标地址是客户端
-        packet.set_default_version();  
-        packet.first_set_ttl(MAX_TTL);  
-        packet.set_gateway_flag(true);
         Ok(Some(packet))
     }
     fn control_addr_request(&self, addr: SocketAddr) -> Result<Option<NetPacket<Vec<u8>>>> {
@@ -499,11 +411,7 @@ impl ServerPacketHandler {
         };
         let register_response = generate_ip(&self.cache, register_client_request).await?;
         let virtual_ip = register_response.virtual_ip.into();
-        // 计算客户端所在网段的网关 IP（x.x.x.1）  
-        let virtual_ip_u32: u32 = virtual_ip;  
-        let client_gateway = (virtual_ip_u32 & 0xFFFFFF00) | 1; // 保留前三个字节，最后一个字节设为 1
-        
-        response.virtual_gateway = client_gateway; // 使用客户端网段的 .1 作为网关
+        response.virtual_gateway = gateway.into();
         response.virtual_netmask = netmask.into();
         response.virtual_ip = virtual_ip;
         response.epoch = register_response.epoch as u32;
@@ -556,12 +464,6 @@ impl ServerPacketHandler {
         net_packet: NetPacket<B>,
         addr: SocketAddr,
     ) -> Result<NetPacket<Vec<u8>>> {
-        println!("收到数据包: 协议={:?}, 传输协议={}, 源={}, 目标={}",   
-        net_packet.protocol(),   
-        net_packet.transport_protocol(),  
-        net_packet.source(),  
-        net_packet.destination()  
-    );
         let req = message::HandshakeRequest::parse_from_bytes(net_packet.payload())?;
         log::info!("handshake:{},{}", addr, req);
         let mut res = message::HandshakeResponse::new();
@@ -767,13 +669,11 @@ pub async fn generate_ip(
 ) -> anyhow::Result<RegisterClientResponse> {
     let gateway: u32 = register_request.gateway.into();
     let netmask: u32 = register_request.netmask.into();
+    let network: u32 = gateway & netmask;
     let mut virtual_ip: u32 = register_request.virtual_ip.into();
     let device_id = register_request.device_id;
     let allow_ip_change = register_request.allow_ip_change;
     let group_id = register_request.group_id;
-    // 使用客户端请求的网段信息,而不是服务端配置  
-    let network: u32 = virtual_ip & netmask; 
-    
     let v = cache
         .virtual_network
         .optionally_get_with(group_id, || {
@@ -786,8 +686,7 @@ pub async fn generate_ip(
         })
         .await;
     // 可分配的ip段
-    let broadcast = network | (!netmask);  
-    let ip_range = network + 2..broadcast; // 跳过 .0 和 .1
+    let ip_range = network + 1..gateway | (!netmask);
     let timestamp = Local::now().timestamp();
     let mut lock = v.write();
     let mut insert = true;
@@ -795,11 +694,6 @@ pub async fn generate_ip(
         if gateway == virtual_ip {
             Err(Error::InvalidIp)?
         }
-        // 禁止使用 x.x.x.1 地址（保留给服务端作为网关）  
-        let last_octet = virtual_ip & 0xFF;  
-        if last_octet == 1 {  
-            Err(Error::InvalidIp)?  
-        } 
         //指定了ip
         if let Some(info) = lock.clients.get_mut(&virtual_ip) {
             if info.device_id != device_id {
