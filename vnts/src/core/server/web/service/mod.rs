@@ -78,10 +78,9 @@ impl VntsWebService {
                 if let Some(client_info) = network_info.write().clients.remove(&ip.into()) {  
                     if let Some(key) = client_info.wireguard {  
                         self.cache.wg_group_map.remove(&key);  
-                        // 删除后保存配置  
-                        let wg_config_path = PathBuf::from("wg_configs.json");  
-                        if let Err(e) = self.cache.save_wg_configs(&wg_config_path) {  
-                            log::warn!("保存WireGuard配置失败: {:?}", e);  
+                        // 删除后保存配置 
+                        if let Err(e) = self.cache.save_wg_configs() {  
+                            log::warn!("修改WireGuard配置失败: {:?}", e);  
                         }  
                     }  
                 }  
@@ -93,10 +92,9 @@ impl VntsWebService {
                         self.cache.wg_group_map.remove(&key);  
                     }  
                 }  
-                // 删除后保存配置  
-                let wg_config_path = PathBuf::from("wg_configs.json");  
-                if let Err(e) = self.cache.save_wg_configs(&wg_config_path) {  
-                    log::warn!("保存WireGuard配置失败: {:?}", e);  
+                // 删除后保存配置 
+                if let Err(e) = self.cache.save_wg_configs() {  
+                    log::warn!("修改WireGuard配置失败: {:?}", e);  
                 }  
             }  
         }  
@@ -179,8 +177,7 @@ impl VntsWebService {
         };
         cache.wg_group_map.insert(public_key, wireguard_config);
         // 保存配置到文件  
-        let wg_config_path = PathBuf::from("wg_configs.json");  
-        if let Err(e) = cache.save_wg_configs(&wg_config_path) {  
+        if let Err(e) = cache.save_wg_configs() {  
             log::warn!("保存WireGuard配置失败: {:?}", e);  
         }
         let config = WgConfig {
