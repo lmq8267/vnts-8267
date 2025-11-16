@@ -236,25 +236,45 @@ impl ServerPacketHandler {
                         self.broadcast(&link_context, broadcast_net_packet, &exclude)?;
                         return Ok(None);
                     }
-                    protocol::ip_turn_packet::Protocol::Ipv4 => {
-                        let destination = net_packet.destination();
-                        let source = net_packet.source();
-                        let mut ipv4 = IpV4Packet::new(net_packet.payload_mut())?;
-                        if let ipv4::protocol::Protocol::Icmp = ipv4.protocol() {
-                            let mut icmp_packet = icmp::IcmpPacket::new(ipv4.payload_mut())?;
-                            if icmp_packet.kind() == Kind::EchoRequest {
-                                //开启ping
-                                icmp_packet.set_kind(Kind::EchoReply);
-                                icmp_packet.update_checksum();
-                                ipv4.set_source_ip(destination);
-                                ipv4.set_destination_ip(source);
-                                ipv4.update_checksum();
-                                return Ok(Some(NetPacket::new0(
-                                    net_packet.data_len(),
-                                    net_packet.raw_buffer().to_vec(),
-                                )?));
-                            }
-                        }
+                    protocol::ip_turn_packet::Protocol::Ipv4 => {  
+                        let destination = net_packet.destination();  
+                        let source = net_packet.source();  
+                        let mut ipv4 = IpV4Packet::new(net_packet.payload_mut())?;  
+                        if let ipv4::protocol::Protocol::Icmp = ipv4.protocol() {  
+                            let mut icmp_packet = icmp::IcmpPacket::new(ipv4.payload_mut())?;  
+                            if icmp_packet.kind() == Kind::EchoRequest {  
+                                let dest_u32: u32 = destination.into();  
+                                let is_gateway = destination == self.config.gateway;  
+              
+                                // 检查是否为某个客户端网段的 .1 地址  
+                                let mut is_client_subnet_gateway = false;  
+                                if (dest_u32 & 0xFF) == 1 {  
+                                    // 获取目标地址的网段（前三个字节）  
+                                    let dest_subnet = dest_u32 & 0xFFFFFF00;  
+                  
+                                    // 检查是否有客户端在这个网段  
+                                    for client_ip in link_context.network_info.read().clients.keys() {  
+                                        let client_subnet = client_ip & 0xFFFFFF00;  
+                                        if dest_subnet == client_subnet {  
+                                            is_client_subnet_gateway = true;  
+                                            break;  
+                                        }  
+                                    }  
+                                }  
+              
+                                if is_gateway || is_client_subnet_gateway {  
+                                    icmp_packet.set_kind(Kind::EchoReply);  
+                                    icmp_packet.update_checksum();  
+                                    ipv4.set_source_ip(destination);  
+                                    ipv4.set_destination_ip(source);  
+                                    ipv4.update_checksum();  
+                                    return Ok(Some(NetPacket::new0(  
+                                        net_packet.data_len(),  
+                                        net_packet.raw_buffer().to_vec(),  
+                                    )?));  
+                                }  
+                            }  
+                        }  
                     }
                     _ => {}
                 }
