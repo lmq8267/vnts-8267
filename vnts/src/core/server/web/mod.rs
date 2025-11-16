@@ -27,11 +27,6 @@ async fn login(service: Data<VntsWebService>, data: web::Json<LoginData>) -> Htt
     }
 }
 
-#[post("/api/group_list")]
-async fn group_list(_req: HttpRequest, service: Data<VntsWebService>) -> HttpResponse {
-    let info = service.group_list();
-    HttpResponse::Ok().json(ResponseMessage::success(info))
-}
 #[post("/api/remove_client")]
 async fn remove_client(
     _req: HttpRequest,
