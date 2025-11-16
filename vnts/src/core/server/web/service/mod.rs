@@ -15,7 +15,7 @@ use crate::core::entity::WireGuardConfig;
 
 use crate::core::server::web::vo::req::{CreateWGData, CreateWgConfig, LoginData, RemoveClientReq, GroupPasswordReq, VerifyPasswordReq};
 use crate::core::server::web::vo::res::{
-    ClientInfo, ClientStatusInfo, GroupList, NetworkInfo, WGData, WgConfig, CheckPasswordResult, 
+    ClientInfo, ClientStatusInfo, NetworkInfo, WGData, WgConfig, CheckPasswordResult, 
 };
 use crate::core::service::server::{generate_ip, RegisterClientRequest};
 use crate::core::store::cache::AppCache;
