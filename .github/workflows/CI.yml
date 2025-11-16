@@ -1,0 +1,167 @@
+name: 编译vnts
+
+on:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  TZ: Asia/Shanghai
+  
+jobs:
+ build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - TARGET: aarch64-unknown-linux-musl
+            OS: ubuntu-latest
+            FEATURES: normal,web
+            STRIP: aarch64-linux-musl-strip
+            
+          - TARGET: armv7-unknown-linux-musleabihf
+            OS: ubuntu-latest
+            FEATURES: normal,web
+            STRIP: armv7l-linux-musleabihf-strip
+            
+          - TARGET: armv7-unknown-linux-musleabi
+            OS: ubuntu-latest
+            FEATURES: normal,web
+            STRIP: armv7m-linux-musleabi-strip
+            
+          - TARGET: arm-unknown-linux-musleabihf
+            OS: ubuntu-latest
+            FEATURES: normal,web
+            STRIP: arm-linux-musleabihf-strip
+            
+          - TARGET: arm-unknown-linux-musleabi
+            OS: ubuntu-latest
+            FEATURES: normal,web
+            STRIP: arm-linux-musleabi-strip
+            
+          - TARGET: mipsel-unknown-linux-musl
+            OS: ubuntu-latest
+            FEATURES: normal,web
+            STRIP: mipsel-linux-musl-strip
+            
+          - TARGET: mips-unknown-linux-musl
+            OS: ubuntu-latest
+            FEATURES: normal
+            STRIP: mips-linux-musl-strip
+            
+          - TARGET: x86_64-unknown-linux-musl
+            OS: ubuntu-latest
+            FEATURES: normal,web
+            STRIP: strip
+            
+          - TARGET: x86_64-unknown-freebsd
+            OS: ubuntu-latest
+            FEATURES: normal,web
+            
+    runs-on: ${{ matrix.OS }}
+    env:
+      NAME: vnts_${{ matrix.TARGET }}
+      TARGET: ${{ matrix.TARGET }}
+      OS: ${{ matrix.OS }}
+      STRIP: ${{ matrix.STRIP }}
+      FEATURES: ${{ matrix.FEATURES }}
+      
+    steps:
+      - uses: actions/checkout@v5
+      
+      - name: 设置编译环境
+        if: ${{ matrix.TARGET != 'x86_64-unknown-freebsd' }}
+        run: |
+            case $TARGET in 
+              mipsel-unknown-linux-musl)
+                MUSL_URI=mipsel-linux-musl-cross
+                ;;
+              aarch64-unknown-linux-musl)
+                MUSL_URI=aarch64-linux-musl-cross
+                ;;
+              armv7-unknown-linux-musleabihf)
+                MUSL_URI=armv7l-linux-musleabihf-cross
+                ;;
+              armv7-unknown-linux-musleabi)
+                MUSL_URI=armv7m-linux-musleabi-cross
+                ;;
+              arm-unknown-linux-musleabihf)
+                MUSL_URI=arm-linux-musleabihf-cross
+                ;;
+              arm-unknown-linux-musleabi)
+                MUSL_URI=arm-linux-musleabi-cross
+                ;;
+              mips-unknown-linux-musl)
+                MUSL_URI=mips-linux-musl-cross
+                ;;
+            esac
+              echo "MUSL_URI=${MUSL_URI}" >> $GITHUB_ENV
+              mkdir -p /opt/musl_gcc 
+              wget -c https://github.com/lmq8267/Toolchain/releases/download/musl-cross/$MUSL_URI.tgz -P /opt/musl_gcc/
+              tar zxf /opt/musl_gcc/$MUSL_URI.tgz -C /opt/musl_gcc/
+              sudo ln -s /opt/musl_gcc/$MUSL_URI/bin/*gcc /usr/bin/
+            if [[ $TARGET == mips-unknown-linux-musl ]] || [[ $TARGET == mipsel-unknown-linux-musl ]] ; then
+            rustup install 1.72.1
+            rustup default 1.72.1
+            fi
+            if [[ $TARGET =~ "x86_64-unknown-linux-musl" ]] ; then
+              sudo apt-get update && sudo apt-get install -qq musl-tools
+            fi
+            sudo timedatectl set-timezone "Asia/Shanghai"
+            cat >>~/.cargo/config <<EOF
+            [target.x86_64-unknown-linux-musl]
+            rustflags = ["-C", "target-feature=+crt-static","-C", "strip=symbols"]
+            [target.aarch64-unknown-linux-musl]
+            linker = "aarch64-linux-musl-gcc"
+            rustflags = ["-C", "target-feature=+crt-static","-C", "strip=symbols"]
+            [target.armv7-unknown-linux-musleabihf]
+            linker = "armv7l-linux-musleabihf-gcc"
+            rustflags = ["-C", "target-feature=+crt-static","-C", "strip=symbols"]
+            [target.armv7-unknown-linux-musleabi]
+            linker = "armv7m-linux-musleabi-gcc"
+            rustflags = ["-C", "target-feature=+crt-static","-C", "strip=symbols"]
+            [target.arm-unknown-linux-musleabihf]
+            linker = "arm-linux-musleabihf-gcc"
+            rustflags = ["-C", "target-feature=+crt-static","-C", "strip=symbols"]
+            [target.arm-unknown-linux-musleabi]
+            linker = "arm-linux-musleabi-gcc"
+            rustflags = ["-C", "target-feature=+crt-static","-C", "strip=symbols"]
+            [target.mipsel-unknown-linux-musl]
+            linker = "mipsel-linux-musl-gcc"
+            rustflags = ["-C", "target-feature=+crt-static","-C", "strip=symbols"]
+            [target.mips-unknown-linux-musl]
+            linker = "mips-linux-musl-gcc"
+            rustflags = ["-C", "target-feature=+crt-static","-C", "strip=symbols"]  
+            EOF
+            
+      - name: 添加编译平台
+        run: rustup target add $TARGET
+        
+      - name: 开始编译
+        if: ${{ matrix.TARGET != 'x86_64-unknown-freebsd' }}
+        run: cargo build --release --target $TARGET --features $FEATURES
+        
+      - name: 编译FreeBSD
+        if: ${{ matrix.TARGET == 'x86_64-unknown-freebsd' }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu qemu-user-static binfmt-support build-essential
+          cargo install cross --git https://github.com/cross-rs/cross
+          sed -i 's/const CLOCK_ID: ClockId = ClockId::CLOCK_BOOTTIME;/const CLOCK_ID: ClockId = ClockId::CLOCK_MONOTONIC;/g' ./lib/boringtun/src/sleepyinstant/unix.rs
+          cross build --target $TARGET --release --features $FEATURES
+          
+      - name: 安装 UPX
+        if: ${{ matrix.TARGET != 'x86_64-unknown-freebsd' }}
+        uses: crazy-max/ghaction-upx@v3
+        with:
+          version: v4.2.4
+          install-only: true
+          
+      - name: 打包压缩
+        run: upx --lzma --best target/${TARGET}/release/vnts || true
+      - 
+       name: 删除工作流
+       uses: GitRML/delete-workflow-runs@main
+       with:
+        token: ${{ secrets.c8 }}
+        retain_days: 2
+        keep_minimum_runs: 1
