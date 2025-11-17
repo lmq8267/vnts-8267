@@ -391,6 +391,7 @@ impl WireGuard {
                 .filter(|v| v.online && v.virtual_ip != u32::from(self.ip))  
                 .map(|v| {  
                     (  
+                        v.virtual_ip.into(),
                         v.address,  
                         v.tcp_sender.clone(),  
                         v.server_secret,  
@@ -407,6 +408,7 @@ impl WireGuard {
                         server_secret,  
                         src_ip,  
                         dest_ip,  
+                        target_virtual_ip,
                         data,  
                         dst_buf,  
                     )  
