@@ -60,37 +60,72 @@
             background-color: #f2f2f2;
         }
 
+        /* 路由配置样式 */  
         .route-item {  
             background-color: #f9f9f9;  
-        }  
-  
-        .route-item .row {  
-            margin: 0;  
+            border: 1px solid #ddd;  
+            padding: 10px;  
+            margin-bottom: 10px;  
+            border-radius: 4px;  
+            display: flex;  
+            align-items: center;  
+            gap: 10px;  
         }  
   
         .route-item label {  
             font-size: 12px;  
             margin-bottom: 5px;  
+            display: block;  
         }  
   
         .route-item input {  
             font-size: 14px;  
+            padding: 5px;  
+            width: 100%;  
+            box-sizing: border-box;  
+        }  
+  
+        .route-item-field {  
+            flex: 1;  
         }  
   
         .remove-route {  
-            margin-bottom: 0;  
+            background-color: #f44336;  
+            color: white;  
+            border: none;  
+            padding: 8px 12px;  
+            border-radius: 4px;  
+            cursor: pointer;  
+            font-size: 14px;  
+            white-space: nowrap;  
+        }  
+  
+        .remove-route:hover {  
+            background-color: #d32f2f;  
         }  
   
         #addRouteBtn {  
             background-color: #6c757d;  
             color: white;  
             border: none;  
-            padding: 5px 15px;  
+            padding: 8px 15px;  
             cursor: pointer;  
+            border-radius: 4px;  
+            font-size: 14px;  
         }  
   
         #addRouteBtn:hover {  
             background-color: #5a6268;  
+        }  
+  
+        #cancelButton {  
+            background-color: #f44336;  
+            color: white;  
+        }  
+  
+        #cancelButton:hover {  
+            background-color: #e53935;  
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);  
         }
     </style>
 </head>
@@ -183,60 +218,52 @@
     </div>
 </div>
 <!-- 添加wg弹窗 -->
-<div class="modal fade" id="addModal" tabindex="-1" role="dialog">  
-    <div class="modal-dialog" role="document">  
-        <div class="modal-content">  
-            <div class="modal-header">  
-                <h5 class="modal-title">添加WireGuard客户端</h5>  
-                <button type="button" class="close" data-dismiss="modal">  
-                    <span>&times;</span>  
-                </button>  
-            </div>  
-            <div class="modal-body">  
-                <form id="addForm">  
-                    <div class="form-group">  
-                        <label for="groupId">组网Token</label>  
-                        <input type="text" class="form-control" id="groupId" required>  
-                    </div>  
-                    <div class="form-group">  
-                        <label for="virtualIP">虚拟IP (可选，留空自动分配)</label>  
-                        <input type="text" class="form-control" id="virtualIP" placeholder="例如: 10.26.0.10">  
-                    </div>  
-                    <div class="form-group">  
-                        <label for="deviceName">设备名称</label>  
-                        <input type="text" class="form-control" id="deviceName" value="WireGuard" required>  
-                    </div>  
-                    <div class="form-group">  
-                        <label for="privateKey">PrivateKey</label>  
-                        <input type="text" class="form-control" id="privateKey" required>  
-                    </div>  
-                    <div class="form-group">  
-                        <label for="endpoint">Endpoint</label>  
-                        <input type="text" class="form-control" id="endpoint" placeholder="例如: 1.2.3.4:29872" required>  
-                    </div>  
-                    <div class="form-group">  
-                        <label for="persistentKeepalive">PersistentKeepalive(秒)</label>  
-                        <input type="number" class="form-control" id="persistentKeepalive" value="10" min="0" max="65535">  
-                    </div>  
-                      
-                    <!-- 路由配置区域 -->  
-                    <div class="form-group">  
-                        <label>路由配置 (可选)</label>  
-                        <small class="form-text text-muted">配置此WireGuard客户端可访问的vnt客户端内网网段</small>  
-                        <div id="routeList" style="margin-top: 10px;">  
-                            <!-- 动态添加的路由条目 -->  
-                        </div>  
-                        <button type="button" class="btn btn-sm btn-secondary" id="addRouteBtn" style="margin-top: 10px;">  
-                            <i class="fa fa-plus"></i> 添加路由  
-                        </button>  
-                    </div>  
-                </form>  
-            </div>  
-            <div class="modal-footer">  
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">取消</button>  
-                <button type="button" class="btn btn-primary" id="submitAdd">确定</button>  
-            </div>  
+<div id="addModal" class="modal">  
+    <div class="add-modal-content" style="max-width: 700px; max-height: 80vh; overflow-y: auto;">  
+        <span class="close">&times;</span>  
+        <h2>WireGuard配置</h2>  
+        <div class="form-group">  
+            <label for="groupId">组网token</label>  
+            <input type="text" id="groupId" placeholder="组网token">  
         </div>  
+        <div class="form-group">  
+            <label for="virtualIP">虚拟IP</label>  
+            <input type="text" id="virtualIP" placeholder="为空则自动分配">  
+        </div>  
+        <div class="form-group">  
+            <label for="deviceName">设备名称</label>  
+            <input type="text" id="deviceName" placeholder="设备名称">  
+        </div>  
+        <div class="form-group">  
+            <label for="privateKey">PrivateKey</label>  
+            <input type="text" id="privateKey" placeholder="PrivateKey">  
+        </div>  
+        <div class="form-group">  
+            <label for="endpoint">Endpoint</label>  
+            <input type="text" id="endpoint" placeholder="服务器的UDP链接地址">  
+        </div>  
+        <div class="form-group">  
+            <label for="persistentKeepalive">PersistentKeepalive</label>  
+            <input type="number" id="persistentKeepalive" value="10" placeholder="PersistentKeepalive">  
+        </div>  
+          
+        <!-- 路由配置区域 -->  
+        <div class="form-group" style="display: block;">  
+            <label style="display: block; margin-bottom: 5px;">路由配置 (可选)</label>  
+            <small style="display: block; color: #666; margin-bottom: 10px;">配置此WireGuard客户端可访问的vnt客户端内网网段</small>  
+            <div id="routeList">  
+                <!-- 动态添加的路由条目 -->  
+            </div>  
+            <button type="button" id="addRouteBtn" style="margin-top: 10px;">  
+                添加路由  
+            </button>  
+        </div>  
+          
+        <div class="button-container">  
+            <button id="confirmButton">确认</button>  
+            <button id="cancelButton" class="close">取消</button>  
+        </div>  
+        <div class="error" id="addWGError"></div>  
     </div>  
 </div>
 </body>
@@ -410,22 +437,16 @@ PersistentKeepalive = ${persistentKeepalive}`;
     /* 添加路由条目 */
     $('#addRouteBtn').click(function() {  
         const routeHtml = `  
-            <div class="route-item" data-index="${routeIndex}" style="border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; border-radius: 4px;">  
-                <div class="row">  
-                    <div class="col-md-5">  
-                        <label>vnt-cli虚拟IP</label>  
-                        <input type="text" class="form-control route-gateway" placeholder="例如: 10.26.0.2" required>  
-                    </div>  
-                    <div class="col-md-5">  
-                        <label>内网网段 (CIDR)</label>  
-                        <input type="text" class="form-control route-network" placeholder="例如: 192.168.1.0/24" required>  
-                    </div>  
-                    <div class="col-md-2" style="display: flex; align-items: flex-end;">  
-                        <button type="button" class="btn btn-sm btn-danger remove-route" style="width: 100%;">  
-                            <i class="fa fa-trash"></i>  
-                        </button>  
-                    </div>  
+            <div class="route-item" data-index="${routeIndex}">  
+                <div class="route-item-field">  
+                    <label>vnt-cli虚拟IP</label>  
+                    <input type="text" class="route-gateway" placeholder="例如: 10.26.0.2">  
                 </div>  
+                <div class="route-item-field">  
+                    <label>内网网段 (CIDR)</label>  
+                    <input type="text" class="route-network" placeholder="例如: 192.168.1.0/24">  
+                </div>  
+                <button type="button" class="remove-route">删除</button>  
             </div>  
         `;
         $('#routeList').append(routeHtml);  
@@ -661,6 +682,10 @@ PersistentKeepalive = ${persistentKeepalive}`;
     $('.close').on('click', function () {
         $('#wgConfigModal').hide();
         $('#addModal').hide();
+    });
+    /* 取消按钮事件（添加到现有的 .close 事件处理器中） */
+    $('#cancelButton').on('click', function() {  
+        $('#addModal').hide();  
     });
     $('#toggleButton').on('click', function () {
         if ($('#qrcode').hasClass('visible')) {
