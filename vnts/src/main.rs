@@ -50,7 +50,7 @@ pub struct StartArgs {
     ///开启指纹校验，开启后只会转发指纹正确的客户端数据包，增强安全性，这会损失一部分性能
     #[arg(short, long, default_value_t = false)]
     finger: bool,
-    /// log路径，默认为当前程序路径，为/dev/null时表示不输出log
+    /// log路径，默认为当前程序路径，为/dev/null时表示不输出log，为console时输出到控制台
     #[arg(short, long)]
     log_path: Option<String>,
     #[cfg(feature = "web")]
@@ -112,54 +112,77 @@ impl Debug for ConfigInfo {
     }
 }
 
-fn log_init(root_path: PathBuf, log_path: Option<String>) {
-    let log_path = match log_path {
-        None => root_path.join("log"),
-        Some(log_path) => {
-            if &log_path == "/dev/null" {
-                return;
-            }
-            PathBuf::from(log_path)
-        }
-    };
-    if !log_path.exists() {
-        let _ = std::fs::create_dir(&log_path);
-    }
-
-    let log_config = log_path.join("log4rs.yaml");
-    if !log_config.exists() {
-        if let Ok(mut f) = std::fs::File::create(&log_config) {
-            let log_path = log_path.to_str().unwrap();
-            let c = format!(
-                "refresh_rate: 30 seconds
-appenders:
-  rolling_file:
-    kind: rolling_file
-    path: {}/vnts.log
-    append: true
-    encoder:
-      pattern: \"{{d}} [{{f}}:{{L}}] {{h({{l}})}} {{M}}:{{m}}{{n}}\"
-    policy:
-      kind: compound
-      trigger:
-        kind: size
-        limit: 10 mb
-      roller:
-        kind: fixed_window
-        pattern: {}/vnts.{{}}.log
-        base: 1
-        count: 5
-
-root:
-  level: info
-  appenders:
-    - rolling_file",
-                log_path, log_path
-            );
-            let _ = f.write_all(c.as_bytes());
-        }
-    }
-    let _ = log4rs::init_file(log_config, Default::default());
+fn log_init(root_path: PathBuf, log_path: Option<String>) {  
+    let log_path_str = match log_path {  
+        None => "./log",  
+        Some(ref path) => {  
+            if path == "/dev/null" {  
+                return;  
+            }  
+            path.as_str()  
+        }  
+    };  
+  
+    // 如果是 console，使用控制台输出  
+    if log_path_str == "console" {  
+        use log4rs::append::console::ConsoleAppender;  
+        use log4rs::config::{Appender, Config, Root};  
+        use log4rs::encode::pattern::PatternEncoder;  
+          
+        let stdout = ConsoleAppender::builder()  
+            .encoder(Box::new(PatternEncoder::new(  
+                "[{d(%Y-%m-%d %H:%M:%S)}]: {l} 【{M}】:{m}{n}"  
+            )))  
+            .build();  
+          
+        let config = Config::builder()  
+            .appender(Appender::builder().build("stdout", Box::new(stdout)))  
+            .build(Root::builder().appender("stdout").build(log::LevelFilter::Info))  
+            .unwrap();  
+          
+        let _ = log4rs::init_config(config);  
+        return;  
+    }  
+  
+    let log_path = PathBuf::from(log_path_str);  
+    if !log_path.exists() {  
+        let _ = std::fs::create_dir(&log_path);  
+    }  
+  
+    let log_config = log_path.join("log4rs.yaml");  
+    if !log_config.exists() {  
+        if let Ok(mut f) = std::fs::File::create(&log_config) {  
+            let log_path = log_path.to_str().unwrap();  
+            let c = format!(  
+                "refresh_rate: 30 seconds  
+appenders:  
+  rolling_file:  
+    kind: rolling_file  
+    path: {}/vnts.log  
+    append: true  
+    encoder:  
+      pattern: \"{{d}} [{{f}}:{{L}}] {{h({{l}})}} {{M}}:{{m}}{{n}}\"  
+    policy:  
+      kind: compound  
+      trigger:  
+        kind: size  
+        limit: 10 mb  
+      roller:  
+        kind: fixed_window  
+        pattern: {}/vnts.{{}}.log  
+        base: 1  
+        count: 5  
+  
+root:  
+  level: info  
+  appenders:  
+    - rolling_file",  
+                log_path, log_path  
+            );  
+            let _ = f.write_all(c.as_bytes());  
+        }  
+    }  
+    let _ = log4rs::init_file(log_config, Default::default());  
 }
 
 pub fn app_root() -> PathBuf {
